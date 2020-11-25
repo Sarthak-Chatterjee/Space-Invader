@@ -404,8 +404,7 @@ def main():
     level = 0
     lives = 5
     paused = False
-    lost = False
-
+    
     # player and enemies
     player = Player()
     player.health = 1
