@@ -35,6 +35,7 @@ LASER_orange = pygame.image.load("images/laser_orange.png")
 
 BG = pygame.transform.scale(pygame.image.load('images/background2.png'), (screen.get_width(), screen.get_height()))
 LIFE = pygame.image.load("images/heart.png")
+EXTRA_LIFE = pygame.transform.scale(LIFE, (48, 48))
 
 COINS = *(pygame.image.load(f"images/coin{i + 1}.png") for i in range(6)),
 coin_timer = 0
@@ -101,8 +102,10 @@ class Player(Spaceship):
         super().__init__(img, cords, width, velocity)
         self.cooldown = 0
         self.lasers = []
+        self.weapon = 'basic'
 
-    def draw_healthbar(self, size=(160, 10), cords=(screen.get_width() - 160 - margin, margin)):
+    def draw_healthbar(self, size=(200, 15)):
+        cords=(screen.get_width() - size[0] - margin, margin)
         x_val, y_val = cords
         length, width = size
         ratio = self.health / self.__class__.health
@@ -135,10 +138,11 @@ class Player(Spaceship):
 
     def shoot(self):
         if sound: laser_player.play()
-        laser = Laser(LASER_PLAYER, (self.x + self.img.get_width() / 2 - LASER_PLAYER.get_width() / 2,
-                                     self.y - LASER_PLAYER.get_height() / 2))
-        self.lasers.append(laser)
-        self.cooldown = int(fps / level) + 1
+        if self.weapon == 'basic':
+            laser = Laser(LASER_PLAYER, (self.x + self.img.get_width() / 2 - LASER_PLAYER.get_width() / 2,
+                                        self.y - LASER_PLAYER.get_height() / 2))
+            self.lasers.append(laser)
+            self.cooldown = int(fps / level) + 1
 
     def get_damage(self, damage):
         if sound: health_lost.play()
@@ -163,6 +167,13 @@ class Player(Spaceship):
             if (event.key == pygame.K_UP or event.key == pygame.K_w) and self.vy == -1: self.vy = 0
             if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and self.vy == 1: self.vy = 0
 
+    def collect(self, thing):
+        global lives
+        if sound: gain_player.play()
+        if thing.img == EXTRA_LIFE: lives = min(5, lives+1)
+        elif thing.img == HEALTH: self.health = min(100, self.health + 15)
+        elif thing.img == WEAPON: self.weapon = 'double'
+
 
 class Enemy(Spaceship):
     lasers = []
@@ -184,9 +195,8 @@ class Enemy(Spaceship):
             self.x = screen.get_width() - self.img.get_width()
             self.randomize()
         if self.y >= screen.get_height():
-            if sound: life_lost.play()
             if lives: lives -= 1
-            self.die(False)
+            self.die(gift=False)
         if random.randrange(1000) < 2: self.shoot()
 
     def randomize(self):
@@ -203,11 +213,15 @@ class Enemy(Spaceship):
 
     def die(self, gift=True):
         global in_a_row
-        super().die(enemies, explode_enemy)
+        if self.y >= screen.get_height(): track = life_lost
+        else: track = explode_enemy
+        super().die(enemies, track)
         if gift:
             in_a_row += 1
-            if random.randrange(2) < 2:
-                x, y = self.x, self.y
+            rarity = random.randrange(10)
+            if rarity < 3 and lives < 5:
+                power_ups.append(PowerUp((self.x, self.y), EXTRA_LIFE))
+            else:
                 coins.append(Coin((self.x, self.y)))
         else:
             in_a_row = 0
@@ -220,7 +234,7 @@ class Coin(Spaceship):
         self.val = in_a_row
 
     def corrections(self):
-        global coin_count, coin_timer, in_a_row
+        global coin_timer
         self.x += self.img.get_width() / 2
         self.img = COINS[coin_timer // 10]
         self.x -= self.img.get_width() / 2
@@ -243,8 +257,6 @@ class PowerUp(Spaceship):
         if self.x >= screen.get_width() - COINS[0].get_width():
             self.x = screen.get_width() - COINS[0].get_width()
         if self.y >= screen.get_height():
-            self.die(coins)
-        if self.collide(player):
             self.die(power_ups)
 
 
@@ -304,6 +316,7 @@ def update_bars(restrictions=True):
 def proceed():
     screen.blit(BG, (0, 0))
     for enemy in enemies: enemy.move()
+    for power_up in power_ups: power_up.move()
     for laser in Enemy.lasers:
         laser.move()
         if laser.y > screen.get_height():
@@ -313,7 +326,7 @@ def proceed():
 
 # check collisions:
 def check_collisions():
-    global coin_count
+    global coin_count, lives
     for enemy in enemies[:]:
         if enemy.collide(player):
             player.get_damage(10)
@@ -322,9 +335,14 @@ def check_collisions():
 
     for coin in coins[:]:
         if coin.collide(player):
-            gain_player.play()
+            if sound: gain_player.play()
             coin.die(coins)
             coin_count += coin.val
+
+    for power_up in power_ups[:]:
+        if power_up.collide(player):
+            player.collect(power_up)
+            power_up.die(power_ups)
 
     for laser in Enemy.lasers[:]:
         if laser.collide(player):
@@ -345,6 +363,7 @@ def level_up():
     cx = screen.get_width() / 2 - 32
     cy = screen.get_height() * 2 / 3 - 32
     Coin.speed = 0
+    PowerUp.speed = 0
 
     if not (teleported and (player.x, player.y) == (cx, cy)):
         if player.y < - player.img.get_height():
@@ -357,8 +376,10 @@ def level_up():
             Enemy.lasers.clear()
             player.lasers.clear()
             while len(coins):
-                gain_player.play()
+                if sound: gain_player.play()
                 coin_count += coins.pop().val
+            while len(power_ups):
+                player.collect(power_ups.pop())
             in_a_row = 0
 
         player.vy = -1
@@ -389,7 +410,7 @@ def level_up():
         if player.health == 100:
             Spaceship.speed += acc
             for _ in range(5 * level): enemies.append(Enemy())
-            Coin.speed = Spaceship.speed
+            Coin.speed = PowerUp.speed = Spaceship.speed
         else:
             player.health += 1
             if player.health > 100: player.health = 100
@@ -399,13 +420,11 @@ def level_up():
 
 
 def main():
-    global music, sound, acc, level, lives, teleported, coin_count, in_a_row
+
     global player, enemies, coins, power_ups
-    level = 0
-    lives = 5
-    paused = False
+    global music, sound, level, lives, teleported, coin_count, in_a_row
     
-    # player and enemies
+    # initialise vars
     player = Player()
     player.health = 1
     enemies = []
@@ -415,8 +434,9 @@ def main():
     coin_count = 0
     in_a_row = 0
     explosion_timer = 0
-
-    # level up vars
+    level = 0
+    lives = 5
+    paused = False
     teleported = False
 
     # game-loop:
@@ -510,7 +530,7 @@ while running:
     for eve in pygame.event.get():
         if eve.type == pygame.QUIT:
             running = False
-        if eve.type == pygame.KEYDOWN:
+        elif eve.type == pygame.KEYDOWN:
             if eve.key == pygame.K_m:
                 music = not music
                 if music:
@@ -523,7 +543,6 @@ while running:
                 main()
 
 # TODO: make score animation
-# TODO: create the concept of high score in different fields (enemies killed, coins gained)
-# TODO: extra lives, health, better lasers to collect from the screen
+# TODO: create the concept of high score in different fields (enemies killed, coins collected)
+# TODO: modify extra lives, health, better lasers to collect from the screen
 # TODO: create a proper main menu
-# TODO: two different modes (with levels, and marathon)
