@@ -1,21 +1,22 @@
-# imports:
+# imports
 import random
 
 import pygame
 from pygame import mixer
 
-# init:
+# init
 pygame.init()
 
-# window and screen:
+# window and screen
 window = pygame.display
 window.set_caption("Space Invader")
 game_icon = pygame.image.load("images/logo.png")
 window.set_icon(game_icon)
-screen = window.set_mode((600, 800))
+width, height = 600, 800
+screen = window.set_mode((width, height))
 margin = 15
 
-# load images:
+# load images
 PLAYER = pygame.image.load("images/player.png")
 LASER_PLAYER = pygame.image.load("images/laser_player.png")
 
@@ -53,8 +54,27 @@ gain_player = mixer.Sound("music/coin_gain.wav")
 life_lost = mixer.Sound("music/life_lost1.wav")
 mixer.music.load("music/Background - Hans Zimmer.mp3")
 
+# pens
+big_pen = pygame.font.SysFont("comicsans", 50)
+medium_pen = pygame.font.SysFont("comicsans", 40)
+small_pen = pygame.font.SysFont("comicsans", 30)
+tiny_pen = pygame.font.SysFont("comicsans", 20)
 
-# Spaceship --> player and enemy:
+lost_label = big_pen.render("You Lost !!!", True, (255, 0, 0))
+new_game_label = medium_pen.render("Press enter to start a new game!", True, (0, 255, 0))
+paused_label = big_pen.render("Game Paused", True, (255, 255, 0))
+continue_label = medium_pen.render("Press p to continue the game!", True, (255, 255, 0))
+level_passed_label = big_pen.render("LEVEL PASSED", True, (0, 255, 0))
+
+# initialize screen and running
+screen.blit(BG, (0, 0))
+mixer.music.play(-1)
+screen.blit(new_game_label, ((screen.get_width() - new_game_label.get_width()) / 2,
+                             screen.get_height() / 2 - new_game_label.get_height()))
+window.update()
+
+
+# Spaceship --> player, enemy, laser, coin, powerup
 class Spaceship:
     speed = 3
 
@@ -142,7 +162,7 @@ class Player(Spaceship):
             laser = Laser(LASER_PLAYER, (self.x + self.img.get_width() / 2 - LASER_PLAYER.get_width() / 2,
                                         self.y - LASER_PLAYER.get_height() / 2))
             self.lasers.append(laser)
-            self.cooldown = int(fps / level) + 1
+            self.cooldown = int(FPS / level) + 1
 
     def get_damage(self, damage):
         if sound: health_lost.play()
@@ -222,7 +242,7 @@ class Enemy(Spaceship):
             if rarity < 3 and lives < 5:
                 power_ups.append(PowerUp((self.x, self.y), EXTRA_LIFE))
             else:
-                coins.append(Coin((self.x, self.y)))
+                coins.append(Coin((self.x - self.img.get_width()/2 + COINS[0].get_width()/2, self.y)))
         else:
             in_a_row = 0
 
@@ -260,6 +280,8 @@ class PowerUp(Spaceship):
             self.die(power_ups)
 
 
+
+
 # some function definitions
 def draw_bar(cords, size, color):
     width, height = size
@@ -269,11 +291,6 @@ def draw_bar(cords, size, color):
     pygame.draw.circle(screen, color, (x + r, y + r), height / 2)
     pygame.draw.circle(screen, color, (x + a + r, y + r), height / 2)
     pygame.draw.rect(screen, color, (x + height / 2, y, a, height))
-
-
-def animate(lst, counter, pos, freq):
-    cycle = fps // freq
-    stay = cycle // len(lst)
 
 
 def draw_lives(gap=margin - 5):
@@ -296,7 +313,7 @@ def draw_coins(gap=margin):
     if in_a_row > 1:
         in_a_row_label = tiny_pen.render(f"{in_a_row}x in a row", True, (0, 255, 0))
         screen.blit(in_a_row_label, (3 * gap, 2 * gap + LIFE.get_height() + COINS[0].get_height()))
-    coin_timer = (coin_timer + 1) % fps
+    coin_timer = (coin_timer + 1) % FPS
 
 
 # update bar status
@@ -305,11 +322,12 @@ def update_bars(restrictions=True):
     draw_coins()
     player.draw_healthbar()
     level_label = small_pen.render(f"Level: {level}", True, (255, 255, 255))
-    screen.blit(level_label, (screen.get_width() - level_label.get_width() - margin, 20 + margin))
+    level_pos = (screen.get_width() - level_label.get_width() - margin, 2.5 * margin)
+    screen.blit(level_label, level_pos)
     enemy_count = small_pen.render(f"Kills: {[5 * level - len(enemies), 0][teleported]} / {5 * level}", True,
                                    (255, 255, 255))
-    screen.blit(enemy_count,
-                (screen.get_width() - enemy_count.get_width() - margin, 30 + margin + level_label.get_height()))
+    enemy_count_pos = (screen.get_width() - enemy_count.get_width() - margin, level_pos[1] + level_label.get_height() + margin//2)
+    screen.blit(enemy_count, enemy_count_pos)
 
 
 # game continues
@@ -331,7 +349,6 @@ def check_collisions():
         if enemy.collide(player):
             player.get_damage(10)
             enemy.die(False)
-            return
 
     for coin in coins[:]:
         if coin.collide(player):
@@ -407,7 +424,7 @@ def level_up():
 
     else:
         if player.health == 100:
-            Spaceship.speed += acc
+            Spaceship.speed += ACC
             for _ in range(5 * level): enemies.append(Enemy())
             Coin.speed = PowerUp.speed = Spaceship.speed
         else:
@@ -441,7 +458,7 @@ def main():
     # game-loop:
     while True:
         window.update()
-        clock.tick(fps)
+        clock.tick(FPS)
 
         # event control
         for eve in pygame.event.get():
@@ -499,27 +516,8 @@ def main():
     window.update()
 
 
-# pens
-big_pen = pygame.font.SysFont("comicsans", 50)
-medium_pen = pygame.font.SysFont("comicsans", 40)
-small_pen = pygame.font.SysFont("comicsans", 30)
-tiny_pen = pygame.font.SysFont("comicsans", 20)
-
-lost_label = big_pen.render("You Lost !!!", True, (255, 0, 0))
-new_game_label = medium_pen.render("Press enter to start a new game!", True, (0, 255, 0))
-paused_label = big_pen.render("Game Paused", True, (255, 255, 0))
-continue_label = medium_pen.render("Press p to continue the game!", True, (255, 255, 0))
-level_passed_label = big_pen.render("LEVEL PASSED", True, (0, 255, 0))
-
-# initialize screen and running
-screen.blit(BG, (0, 0))
-mixer.music.play(-1)
-screen.blit(new_game_label, ((screen.get_width() - new_game_label.get_width()) / 2,
-                             screen.get_height() / 2 - new_game_label.get_height()))
-window.update()
-
-acc = 0.2
-fps = 60
+ACC = 0.2
+FPS = 60
 clock = pygame.time.Clock()
 running = True
 music = True
