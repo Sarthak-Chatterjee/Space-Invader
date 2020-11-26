@@ -90,7 +90,7 @@ class Spaceship:
 
 class Laser(Spaceship):
 
-    def __init__(self, img, cords, width=None, velocity=(0, -1.5)):
+    def __init__(self, img, cords, width=None, velocity=(0, -1)):
         super().__init__(img, cords, width, velocity)
 
 
@@ -362,8 +362,7 @@ def level_up():
     global teleported, level, coin_count, in_a_row
     cx = screen.get_width() / 2 - 32
     cy = screen.get_height() * 2 / 3 - 32
-    Coin.speed = 0
-    PowerUp.speed = 0
+    Coin.speed = PowerUp.speed = 0
 
     if not (teleported and (player.x, player.y) == (cx, cy)):
         if player.y < - player.img.get_height():
@@ -514,14 +513,15 @@ level_passed_label = big_pen.render("LEVEL PASSED", True, (0, 255, 0))
 
 # initialize screen and running
 screen.blit(BG, (0, 0))
+mixer.music.play(-1)
 screen.blit(new_game_label, ((screen.get_width() - new_game_label.get_width()) / 2,
                              screen.get_height() / 2 - new_game_label.get_height()))
 window.update()
-mixer.music.play(-1)
-running = True
+
+acc = 0.2
 fps = 60
 clock = pygame.time.Clock()
-acc = 0.2
+running = True
 music = True
 sound = True
 
