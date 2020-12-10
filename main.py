@@ -526,7 +526,7 @@ sound = True
 # mainloop
 while running:
     for eve in pygame.event.get():
-        if eve.type == pygame.QUIT:
+        if eve.type == pygame.QUIT: 
             running = False
         elif eve.type == pygame.KEYDOWN:
             if eve.key == pygame.K_m:
